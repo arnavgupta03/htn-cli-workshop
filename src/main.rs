@@ -1,4 +1,7 @@
 use clap::{Parser,ValueEnum};
+use std::fs::File;
+use std::path::Path;
+use std::io::BufReader;
 
 #[derive(ValueEnum,Clone,Debug)]
 enum Operation {
@@ -33,6 +36,12 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
+    let path = Path::new("store.json")
+    let file = match File::open(&path) {
+        Ok(file) => file,
+        Err(why) => panic!("couldn't open store file: {}", why);
+    };
+
     match args.operation {
         Operation::Generate => {
             // TODO: generate and store password
@@ -41,7 +50,17 @@ fn main() {
             // TODO: insert given password
         },
         Operation::Get => {
-            // TODO: get password
+            let reader = BufReader::new(file);
+
+            let store = match serde_json::from_reader(reader) {
+                Ok(json) => json,
+                Err(why) => panic!("couldn't parse store file JSON: {}", why);
+            };
+
+            match store[args.name] {
+                serde_json::Null => println!("no password for {}", args.name),
+                serde_json::String(s) => println!("password for {}", s),
+            }
         },
     }
 }

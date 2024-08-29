@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.5.14", features = ["derive"] }
 ratatui = "0.28.0"
+serde_json = "1.0.127"
