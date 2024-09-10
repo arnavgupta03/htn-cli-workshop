@@ -1,10 +1,23 @@
 use clap::{Parser, ValueEnum};
 use core::panic;
+use crossterm::{
+    event::{self, Event, KeyCode},
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    ExecutableCommand,
+};
 use rand::{distributions::Alphanumeric, Rng};
+use ratatui::{
+    prelude::CrosstermBackend,
+    widgets::{Block, Paragraph},
+    Frame, Terminal,
+};
 use serde_json::{Map, Value};
-use std::fs::File;
-use std::io::{BufReader, Write};
 use std::path::Path;
+use std::{
+    collections::HashMap,
+    io::{self, BufReader, Write},
+};
+use std::{fs::File, io::stdout};
 
 #[derive(ValueEnum, Clone, Debug)]
 enum Operation {
@@ -24,9 +37,9 @@ enum TInterface {
 #[command(about="A Simple Password Manager", long_about = None)]
 struct Args {
     #[arg(short, long, value_enum)]
-    operation: Operation,
+    operation: Option<Operation>,
 
-    #[arg(short, long)]
+    #[arg(short, long, default_value = "default")]
     name: String,
 
     #[arg(short, long)]
@@ -36,10 +49,10 @@ struct Args {
     interface: Option<TInterface>,
 }
 
-fn main() {
+fn main() -> io::Result<()> {
     let args = Args::parse();
 
-    let path = Path::new("store.json");
+    let path = Path::new("src/store.json");
     let file = match File::open(&path) {
         Ok(file) => file,
         Err(why) => panic!("couldn't open store file: {}", why),
@@ -65,31 +78,93 @@ fn main() {
         }
     };
 
-    match args.operation {
-        Operation::Generate => {
-            let to_insert = rand::thread_rng()
-                .sample_iter(&Alphanumeric)
-                .take(16)
-                .map(char::from)
-                .collect();
+    match args.interface {
+        Some(TInterface::CLI) | None => {
+            match args.operation {
+                Some(Operation::Generate) => {
+                    let to_insert = rand::thread_rng()
+                        .sample_iter(&Alphanumeric)
+                        .take(16)
+                        .map(char::from)
+                        .collect();
 
-            insert_password(to_insert)
-        }
-        Operation::Insert => {
-            let to_insert = match args.password_to_insert {
-                Some(p) => p,
-                None => {
-                    println!("please pass a password to insert!");
-                    return;
+                    insert_password(to_insert);
                 }
-            };
+                Some(Operation::Insert) => {
+                    let to_insert = match args.password_to_insert {
+                        Some(p) => p,
+                        None => {
+                            println!("please pass a password to insert!");
+                            return Ok(());
+                        }
+                    };
 
-            insert_password(to_insert)
+                    insert_password(to_insert);
+                }
+                Some(Operation::Get) => match &store[&args.name] {
+                    Value::Null => {
+                        println!("no password for {}", args.name)
+                    }
+                    Value::String(s) => println!("password for {}", s),
+                    _ => panic!("bad name passed!"),
+                },
+                None => panic!("no operation passed for CLI"),
+            }
+            Ok(())
         }
-        Operation::Get => match &store[&args.name] {
-            Value::Null => println!("no password for {}", args.name),
-            Value::String(s) => println!("password for {}", s),
-            _ => panic!("bad name passed!"),
-        },
+        Some(TInterface::TUI) => {
+            enable_raw_mode()?;
+            stdout().execute(EnterAlternateScreen)?;
+            let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
+
+            let mut time_to_quit = false;
+
+            while !time_to_quit {
+                terminal.draw(ui)?;
+                time_to_quit = handle_events()?;
+            }
+
+            disable_raw_mode()?;
+            stdout().execute(LeaveAlternateScreen)?;
+
+            Ok(())
+        }
     }
+}
+
+fn ui(frame: &mut Frame) {
+    frame.render_widget(
+        Paragraph::new(gather_passwords()).block(Block::bordered().title("Password Manager")),
+        frame.area(),
+    );
+}
+
+fn gather_passwords() -> String {
+    let path = Path::new("src/store.json");
+    let file = match File::open(&path) {
+        Ok(file) => file,
+        Err(why) => panic!("couldn't open store file: {}", why),
+    };
+    let reader = BufReader::new(file);
+
+    let store: HashMap<String, Value> = match serde_json::from_reader(reader) {
+        Ok(json) => json,
+        Err(why) => panic!("couldn't parse store file JSON: {}", why),
+    };
+
+    match store.len() {
+        0 => "No passwords stored currently!".to_string(),
+        _ => serde_json::to_string(&store).unwrap(),
+    }
+}
+
+fn handle_events() -> io::Result<bool> {
+    if event::poll(std::time::Duration::from_millis(50))? {
+        if let Event::Key(key) = event::read()? {
+            if key.kind == event::KeyEventKind::Press && key.code == KeyCode::Char('q') {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
 }

@@ -247,6 +247,7 @@ name = "htn_cli_workshop"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "crossterm",
  "rand",
  "ratatui",
  "serde_json",
