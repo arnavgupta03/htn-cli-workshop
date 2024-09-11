@@ -1,26 +1,33 @@
-use clap::{Parser,ValueEnum};
+use std::{
+    fs::File,
+    io::{self, BufReader},
+    path::Path,
+};
 
-#[derive(ValueEnum,Clone,Debug)]
+use clap::{Parser, ValueEnum};
+use ratatui::Frame;
+
+#[derive(ValueEnum, Clone, Debug)]
 enum Operation {
     Generate,
     Insert,
     Get,
 }
 
-#[derive(ValueEnum,Clone,Debug,Default)]
+#[derive(ValueEnum, Clone, Debug, Default)]
 enum TInterface {
     #[default]
     CLI,
     TUI,
 }
 
-#[derive(Parser,Debug)]
+#[derive(Parser, Debug)]
 #[command(about="A Simple Password Manager", long_about = None)]
 struct Args {
     #[arg(short, long, value_enum)]
-    operation: Operation,
+    operation: Option<Operation>,
 
-    #[arg(short, long)]
+    #[arg(short, long, default_value = "default")]
     name: String,
 
     #[arg(short, long)]
@@ -33,15 +40,37 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
+    let path = Path::new("src/store.json");
+    let file = match File::open(&path) {
+        Ok(file) => file,
+        Err(why) => panic!("couldn't open store file: {}", why),
+    };
+    let reader = BufReader::new(file);
+
     match args.operation {
-        Operation::Generate => {
-            // TODO: generate and store password
-        },
-        Operation::Insert => {
-            // TODO: insert given password
-        },
-        Operation::Get => {
-            // TODO: get password
-        },
+        Some(Operation::Generate) => {
+            todo!("generate and store password")
+        }
+        Some(Operation::Insert) => {
+            todo!("insert given password")
+        }
+        Some(Operation::Get) => {
+            todo!("get password")
+        }
+        None => {
+            todo!("error case")
+        }
     }
+}
+
+fn ui(frame: &mut Frame) {
+    todo!("render frame")
+}
+
+fn gather_passwords() -> String {
+    todo!("return all passwords")
+}
+
+fn handle_events() -> io::Result<bool> {
+    todo!("handle input for tui")
 }
