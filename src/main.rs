@@ -9,7 +9,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use ratatui::{
     prelude::CrosstermBackend,
     widgets::{Block, Paragraph},
-    Frame, Terminal,
+    Terminal,
 };
 use serde_json::{Map, Value};
 use std::path::Path;
@@ -101,12 +101,17 @@ fn main() -> io::Result<()> {
 
                     insert_password(to_insert);
                 }
-                Some(Operation::Get) => match &store[&args.name] {
-                    Value::Null => {
-                        println!("no password for {}", args.name)
+                Some(Operation::Get) => match store.contains_key(&args.name) {
+                    false => {
+                        println!("no password for {}", args.name);
                     }
-                    Value::String(s) => println!("password for {}", s),
-                    _ => panic!("bad name passed!"),
+                    true => match &store[&args.name] {
+                        Value::Null => {
+                            println!("no password for {}", args.name)
+                        }
+                        Value::String(s) => println!("password for {}", s),
+                        _ => panic!("bad name passed!"),
+                    },
                 },
                 None => panic!("no operation passed for CLI"),
             }
@@ -118,9 +123,16 @@ fn main() -> io::Result<()> {
             let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
 
             let mut time_to_quit = false;
+            let passwords: String = gather_passwords();
 
             while !time_to_quit {
-                terminal.draw(ui)?;
+                terminal.draw(|frame| {
+                    frame.render_widget(
+                        Paragraph::new(passwords.clone())
+                            .block(Block::bordered().title("Password Manager")),
+                        frame.area(),
+                    );
+                })?;
                 time_to_quit = handle_events()?;
             }
 
@@ -130,13 +142,6 @@ fn main() -> io::Result<()> {
             Ok(())
         }
     }
-}
-
-fn ui(frame: &mut Frame) {
-    frame.render_widget(
-        Paragraph::new(gather_passwords()).block(Block::bordered().title("Password Manager")),
-        frame.area(),
-    );
 }
 
 fn gather_passwords() -> String {
@@ -154,7 +159,11 @@ fn gather_passwords() -> String {
 
     match store.len() {
         0 => "No passwords stored currently!".to_string(),
-        _ => serde_json::to_string(&store).unwrap(),
+        _ => store
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect::<Vec<String>>()
+            .join("\n"),
     }
 }
 
