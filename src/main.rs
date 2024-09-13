@@ -5,7 +5,6 @@ use std::{
 };
 
 use clap::{Parser, ValueEnum};
-use ratatui::Frame;
 
 #[derive(ValueEnum, Clone, Debug)]
 enum Operation {
@@ -61,10 +60,6 @@ fn main() {
             todo!("error case")
         }
     }
-}
-
-fn ui(frame: &mut Frame) {
-    todo!("render frame")
 }
 
 fn gather_passwords() -> String {
